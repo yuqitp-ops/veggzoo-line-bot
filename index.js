@@ -93,24 +93,33 @@ function parseQuantity(text) {
 }
 
 function buildGeneralQuote(qty) {
-  const { label, price } = getCurrentPrice();
+  const earlyPrice = Math.round(PRODUCT.originalPrice * 0.9);   // 超早鳥 $765
+  const birdPrice  = Math.round(PRODUCT.originalPrice * 0.95);  // 早鳥 $808
+
   const isCombo = qty === PRODUCT.comboQty;
-  const subtotal = isCombo ? PRODUCT.comboPrice : price * qty;
-  const shipping = calcShipping(subtotal);
-  const total = subtotal + shipping;
+
+  // 運費以超早鳥價計算（鼓勵早點下單）
+  const { price: currentPrice } = getCurrentPrice();
+  const subtotalForShipping = isCombo ? PRODUCT.comboPrice : currentPrice * qty;
+  const shipping = calcShipping(subtotalForShipping);
   const shippingText = shipping === 0 ? '免運 🎉' : `$${shipping}`;
 
-  const priceRow = isCombo
-    ? `5盒特惠價：$${PRODUCT.comboPrice}`
-    : `${label}：$${price}/盒\n小計：$${subtotal}`;
+  let priceBlock;
+  if (isCombo) {
+    priceBlock = `5盒特惠：$${PRODUCT.comboPrice}（省 $${PRODUCT.originalPrice * qty - PRODUCT.comboPrice}）`;
+  } else {
+    priceBlock =
+      `原價：$${PRODUCT.originalPrice}/盒　→ $${PRODUCT.originalPrice * qty}\n` +
+      `⭐ 超早鳥（8/1–9/1）：$${earlyPrice}/盒　→ $${earlyPrice * qty}\n` +
+      `⭐ 早鳥（9/2–9/10）：$${birdPrice}/盒　→ $${birdPrice * qty}`;
+  }
 
   let hint = '';
   if (!isCombo && qty < PRODUCT.comboQty) {
-    const saving = price * PRODUCT.comboQty - PRODUCT.comboPrice;
-    hint = `\n💡 5盒特惠 $${PRODUCT.comboPrice}（比單買省 $${saving}）`;
+    hint = `\n💡 5盒特惠 $${PRODUCT.comboPrice}，比原價省 $${PRODUCT.originalPrice * PRODUCT.comboQty - PRODUCT.comboPrice}`;
   }
 
-  return `🎑 2026中秋禮盒報價\n${PRODUCT.name}\n─────────────\n數量：${qty} 盒\n${priceRow}\n運費：${shippingText}\n合計：$${total}${hint}\n─────────────\n後續由我們專人為您服務 🙏`;
+  return `🎑 2026中秋禮盒報價\n${PRODUCT.name}\n─────────────\n數量：${qty} 盒\n\n${priceBlock}\n─────────────\n運費：${shippingText}${hint}\n─────────────\n後續由我們專人為您服務 🙏`;
 }
 
 function buildBulkQuote(qty, boxes) {
