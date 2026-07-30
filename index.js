@@ -43,7 +43,9 @@ function getBulkPrice() {
 }
 
 function calcShipping(subtotal) {
-  return subtotal >= 2026 ? 0 : 65;
+  const cvs = subtotal >= 2026 ? '超商免運 🎉' : `超商 $65`;
+  const home = subtotal >= 4000 ? '宅配免運 🎉' : `宅配 $150`;
+  return { cvs, home };
 }
 
 function calcBulkShipping(boxes) {
@@ -93,33 +95,46 @@ function parseQuantity(text) {
 }
 
 function buildGeneralQuote(qty) {
-  const earlyPrice = Math.round(PRODUCT.originalPrice * 0.9);   // 超早鳥 $765
-  const birdPrice  = Math.round(PRODUCT.originalPrice * 0.95);  // 早鳥 $808
+  const origPrice  = PRODUCT.originalPrice;
+  const earlyPrice = Math.round(origPrice * 0.9);   // 超早鳥 $765
+  const birdPrice  = Math.round(origPrice * 0.95);  // 早鳥 $808
 
   const isCombo = qty === PRODUCT.comboQty;
 
-  // 運費以超早鳥價計算（鼓勵早點下單）
-  const { price: currentPrice } = getCurrentPrice();
-  const subtotalForShipping = isCombo ? PRODUCT.comboPrice : currentPrice * qty;
-  const shipping = calcShipping(subtotalForShipping);
-  const shippingText = shipping === 0 ? '免運 🎉' : `$${shipping}`;
+  let priceBlock, shippingBlock, hint = '';
 
-  let priceBlock;
   if (isCombo) {
-    priceBlock = `6盒特惠：$${PRODUCT.comboPrice}（省 $${PRODUCT.originalPrice * qty - PRODUCT.comboPrice}）\n🚚 宅配免運 🎉`;
-  } else {
+    const comboOrig  = PRODUCT.comboPrice;                      // $4,900
+    const comboEarly = Math.round(comboOrig * 0.9);             // $4,410
+    const comboBird  = Math.round(comboOrig * 0.95);            // $4,655
+    const saving     = origPrice * qty - comboOrig;
+
     priceBlock =
-      `原價：$${PRODUCT.originalPrice}/盒　→ $${PRODUCT.originalPrice * qty}\n` +
-      `⭐ 超早鳥（8/1–9/1）：$${earlyPrice}/盒　→ $${earlyPrice * qty}\n` +
-      `⭐ 早鳥（9/2–9/10）：$${birdPrice}/盒　→ $${birdPrice * qty}`;
+      `原價：$${comboOrig}（省 $${saving}）\n` +
+      `⭐ 超早鳥（8/1–9/1）：$${comboEarly}\n` +
+      `⭐ 早鳥（9/2–9/10）：$${comboBird}`;
+    shippingBlock = `🚚 宅配免運 🎉`;
+  } else {
+    const origTotal  = origPrice * qty;
+    const earlyTotal = earlyPrice * qty;
+    const birdTotal  = birdPrice * qty;
+
+    priceBlock =
+      `原價：$${origPrice}/盒　→ $${origTotal}\n` +
+      `⭐ 超早鳥（8/1–9/1）：$${earlyPrice}/盒　→ $${earlyTotal}\n` +
+      `⭐ 早鳥（9/2–9/10）：$${birdPrice}/盒　→ $${birdTotal}`;
+
+    // 用超早鳥價估運費（最優情境）
+    const { cvs, home } = calcShipping(earlyTotal);
+    shippingBlock = `${cvs} ／ ${home}`;
+
+    if (qty < PRODUCT.comboQty) {
+      const comboEarly = Math.round(PRODUCT.comboPrice * 0.9);
+      hint = `\n💡 6盒特惠 $${PRODUCT.comboPrice}（超早鳥 $${comboEarly}），宅配免運`;
+    }
   }
 
-  let hint = '';
-  if (!isCombo && qty < PRODUCT.comboQty) {
-    hint = `\n💡 6盒特惠 $${PRODUCT.comboPrice} 宅配免運，比原價省 $${PRODUCT.originalPrice * PRODUCT.comboQty - PRODUCT.comboPrice}`;
-  }
-
-  return `🎑 2026中秋禮盒報價\n${PRODUCT.name}\n─────────────\n數量：${qty} 盒\n\n${priceBlock}\n─────────────\n運費：${shippingText}${hint}\n─────────────\n後續由我們專人為您服務 🙏`;
+  return `🎑 2026中秋禮盒報價\n${PRODUCT.name}\n─────────────\n數量：${qty} 盒\n\n${priceBlock}\n─────────────\n運費：${shippingBlock}${hint}\n─────────────\n後續由我們專人為您服務 🙏`;
 }
 
 function buildBulkQuote(qty, boxes) {
