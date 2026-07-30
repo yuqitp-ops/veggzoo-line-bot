@@ -81,16 +81,6 @@ function parseQuantity(text) {
     }
   }
 
-  // 純數字（1–99）→ 視為盒數
-  const numOnly = t.match(/^(\d+)$/);
-  if (numOnly) {
-    const n = parseInt(numOnly[1]);
-    if (n >= 1 && n <= 99) {
-      const isBulk = n >= PRODUCT.bulkUnit && n % PRODUCT.bulkUnit === 0;
-      return { qty: n, boxes: isBulk ? n / PRODUCT.bulkUnit : null, isBulk };
-    }
-  }
-
   return null;
 }
 
