@@ -12,8 +12,8 @@ const PRODUCT = {
   name: '夏秋豐收綜合禮盒',
   desc: '蛋黃酥不加蛋*4顆、秋日黃金蘋果酥*3顆、仲夏檸檬派對酥*3顆',
   originalPrice: 850,
-  comboQty: 5,
-  comboPrice: 3700,
+  comboQty: 6,
+  comboPrice: 4900,
   bulkUnit: 14
 };
 
@@ -106,7 +106,7 @@ function buildGeneralQuote(qty) {
 
   let priceBlock;
   if (isCombo) {
-    priceBlock = `5盒特惠：$${PRODUCT.comboPrice}（省 $${PRODUCT.originalPrice * qty - PRODUCT.comboPrice}）`;
+    priceBlock = `6盒特惠：$${PRODUCT.comboPrice}（省 $${PRODUCT.originalPrice * qty - PRODUCT.comboPrice}）\n🚚 宅配免運 🎉`;
   } else {
     priceBlock =
       `原價：$${PRODUCT.originalPrice}/盒　→ $${PRODUCT.originalPrice * qty}\n` +
@@ -116,7 +116,7 @@ function buildGeneralQuote(qty) {
 
   let hint = '';
   if (!isCombo && qty < PRODUCT.comboQty) {
-    hint = `\n💡 5盒特惠 $${PRODUCT.comboPrice}，比原價省 $${PRODUCT.originalPrice * PRODUCT.comboQty - PRODUCT.comboPrice}`;
+    hint = `\n💡 6盒特惠 $${PRODUCT.comboPrice} 宅配免運，比原價省 $${PRODUCT.originalPrice * PRODUCT.comboQty - PRODUCT.comboPrice}`;
   }
 
   return `🎑 2026中秋禮盒報價\n${PRODUCT.name}\n─────────────\n數量：${qty} 盒\n\n${priceBlock}\n─────────────\n運費：${shippingText}${hint}\n─────────────\n後續由我們專人為您服務 🙏`;
@@ -155,7 +155,7 @@ const GENERAL_MSG = `一般訂購說明 🛍️
 
 ⭐ 超早鳥價（8/1–9/1）：$765/盒
 ⭐ 早鳥價（9/2–9/10）：$808/盒
-🎁 5盒特惠價：$3,700
+🎁 6盒特惠價：$4,900（宅配免運）
 
 ━━━━━━━━━━━━
 
