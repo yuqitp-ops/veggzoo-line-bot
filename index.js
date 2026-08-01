@@ -235,6 +235,25 @@ async function lineReplyMulti(replyToken, texts) {
   );
 }
 
+async function lineReplyWithButtons(replyToken, text, buttons) {
+  await axios.post('https://api.line.me/v2/bot/message/reply',
+    {
+      replyToken,
+      messages: [{
+        type: 'text',
+        text,
+        quickReply: {
+          items: buttons.map(({ label, value }) => ({
+            type: 'action',
+            action: { type: 'message', label, text: value }
+          }))
+        }
+      }]
+    },
+    { headers: { 'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}` } }
+  );
+}
+
 async function linePush(to, text) {
   await axios.post('https://api.line.me/v2/bot/message/push',
     { to, messages: [{ type: 'text', text }] },
@@ -257,29 +276,18 @@ function setSession(userId, data) {
 }
 
 const CONFIRM_WORDS = /^(確認|對|會|是|yes)$/i;
-const DATES = { '1': '9/1–9/6', '2': '9/7–9/13', '3': '9/14–9/21' };
+const DATES = { '超商 9/1–9/6': '9/1–9/6', '超商 9/7–9/13': '9/7–9/13', '超商 9/14–9/21': '9/14–9/21',
+                '宅配 9/1–9/6': '9/1–9/6', '宅配 9/7–9/13': '9/7–9/13', '宅配 9/14–9/21': '9/14–9/21' };
 
 const CONFIRM_QUESTION = `確認訂單嗎？\n（回覆：確認 ／ 對 ／ 會 ／ 是 ／ Yes）`;
 
-const FORM_TEMPLATE =
-  `請填寫以下資料後，直接回傳給我們 📋\n` +
-  `─────────────\n` +
-  `1. 配送方式：（填「超商」或「宅配」）\n` +
-  `　超商（7-11／全家）：$65／滿$2,026免運\n` +
-  `　宅配（中華郵政）：$150\n\n` +
-  `2. 出貨日期：（填 1、2 或 3）\n` +
-  `　1 → 9/1–9/6\n` +
-  `　2 → 9/7–9/13\n` +
-  `　3 → 9/14–9/21\n\n` +
-  `3. 姓名：\n` +
-  `4. 電話：\n` +
-  `5. 地址／超商門市代號：\n` +
-  `─────────────\n` +
-  `請複製上方格式填入後回傳 😊`;
+const DELIVERY_BUTTONS = [
+  { label: '超商（7-11／全家）$65', value: '超商' },
+  { label: '宅配（中華郵政）$150',  value: '宅配' }
+];
 
 // CONFIRM 狀態：等客人說確認
 async function stepConfirm(text, userId, replyToken, session) {
-  // 若客人改輸入數量，重新報價
   const parsed = parseQuantity(text);
   if (parsed) {
     const { qty, boxes, isBulk } = parsed;
@@ -289,73 +297,84 @@ async function stepConfirm(text, userId, replyToken, session) {
     return;
   }
   if (!CONFIRM_WORDS.test(text)) return;
-  setSession(userId, { ...session, state: 'FORM' });
-  await lineReply(replyToken, FORM_TEMPLATE);
+  setSession(userId, { ...session, state: 'DELIVERY' });
+  await lineReplyWithButtons(replyToken, '請選擇配送方式 🚚', DELIVERY_BUTTONS);
 }
 
-// FORM 狀態：解析填回的表單 → 寫入 Sheet
-async function stepForm(text, userId, replyToken, session) {
-  const info = {};
-  for (const line of text.split('\n')) {
-    const t = line.trim();
-    const val = t.replace(/^[1-5]\.\s*/, '').replace(/.*[：:]\s*/, '').trim();
-    if (/配送方式/.test(t)) info.deliveryRaw = val;
-    if (/出貨日期/.test(t)) info.dateRaw = val;
-    if (/姓名/.test(t)) info.name = val;
-    if (/電話/.test(t)) info.phone = val;
-    if (/地址|門市/.test(t)) info.location = val;
-  }
+// DELIVERY 狀態：客人點按鈕選配送
+async function stepDelivery(text, userId, replyToken, session) {
+  let deliveryType;
+  if (text.includes('超商')) deliveryType = '超商';
+  else if (text.includes('宅配')) deliveryType = '宅配';
+  else { await lineReplyWithButtons(replyToken, '請選擇配送方式 😊', DELIVERY_BUTTONS); return; }
 
-  if (info.deliveryRaw?.includes('超商')) info.deliveryType = '超商';
-  else if (info.deliveryRaw?.includes('宅配')) info.deliveryType = '宅配';
+  setSession(userId, { ...session, state: 'DATE', deliveryType });
 
-  info.dateChoice = DATES[info.dateRaw?.trim()];
+  const freeNote = deliveryType === '超商' ? '（滿$2,026免運）' : '（滿$4,000免運）';
+  await lineReplyWithButtons(replyToken,
+    `配送：${deliveryType} ✅\n\n請選擇出貨日期 📦`,
+    [
+      { label: '9/1–9/6',   value: `${deliveryType} 9/1–9/6` },
+      { label: '9/7–9/13',  value: `${deliveryType} 9/7–9/13` },
+      { label: '9/14–9/21', value: `${deliveryType} 9/14–9/21` }
+    ]
+  );
+}
 
-  const missing = [];
-  if (!info.name)         missing.push('姓名');
-  if (!info.phone)        missing.push('電話');
-  if (!info.deliveryType) missing.push('配送方式（填「超商」或「宅配」）');
-  if (!info.dateChoice)   missing.push('出貨日期（填 1、2 或 3）');
-
-  if (missing.length > 0) {
-    await lineReply(replyToken,
-      `以下欄位未填或格式不對，請補充 😊\n\n${missing.map(m => `• ${m}`).join('\n')}`
-    );
+// DATE 狀態：客人點按鈕選日期
+async function stepDate(text, userId, replyToken, session) {
+  const dateChoice = DATES[text];
+  if (!dateChoice) {
+    await lineReplyWithButtons(replyToken, '請選擇出貨日期 😊', [
+      { label: '9/1–9/6',   value: `${session.deliveryType} 9/1–9/6` },
+      { label: '9/7–9/13',  value: `${session.deliveryType} 9/7–9/13` },
+      { label: '9/14–9/21', value: `${session.deliveryType} 9/14–9/21` }
+    ]);
     return;
   }
 
-  const { qty, isBulk } = session;
+  setSession(userId, { ...session, state: 'INFO', dateChoice });
+  const infoPrompt = session.deliveryType === '超商'
+    ? `出貨日期：${dateChoice} ✅\n\n請填寫收件資料，直接回傳 😊\n\n姓名：\n電話：\n超商門市代號：`
+    : `出貨日期：${dateChoice} ✅\n\n請填寫收件資料，直接回傳 😊\n\n姓名：\n電話：\n宅配地址：`;
+  await lineReply(replyToken, infoPrompt);
+}
+
+// INFO 狀態：解析收件資料 → 寫入 Sheet
+async function stepInfo(text, userId, replyToken, session) {
+  const info = {};
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    const val = t.replace(/.*[：:]\s*/, '').trim();
+    if (/姓名/.test(t))              info.name = val;
+    if (/電話/.test(t))              info.phone = val;
+    if (/門市代號|宅配地址|地址/.test(t)) info.location = val;
+  }
+
+  const missing = [];
+  if (!info.name)     missing.push('姓名');
+  if (!info.phone)    missing.push('電話');
+  if (!info.location) missing.push(session.deliveryType === '超商' ? '超商門市代號' : '宅配地址');
+
+  if (missing.length > 0) {
+    await lineReply(replyToken, `以下欄位未填，請補充 😊\n\n${missing.map(m => `• ${m}`).join('\n')}`);
+    return;
+  }
+
+  const { qty, isBulk, deliveryType, dateChoice } = session;
   const time = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
 
-  await appendToSheet([
-    time,
-    isBulk ? '大宗' : '一般',
-    `${qty}盒`,
-    info.deliveryType,
-    info.dateChoice,
-    info.name,
-    info.phone,
-    info.location || ''
-  ]);
+  await appendToSheet([time, isBulk ? '大宗' : '一般', `${qty}盒`, deliveryType, dateChoice, info.name, info.phone, info.location]);
 
   await linePush(OWNER_LINE_ID,
-    `🔔 新訂單！請確認金額\n` +
-    `━━━━━━━━━━━━\n` +
-    `數量：${qty}盒\n` +
-    `配送：${info.deliveryType}\n` +
-    `出貨：${info.dateChoice}\n` +
-    `收件：${info.name}　${info.phone}\n` +
-    `地址/門市：${info.location || '（未填）'}\n` +
-    `━━━━━━━━━━━━\n` +
+    `🔔 新訂單！請確認金額\n━━━━━━━━━━━━\n` +
+    `數量：${qty}盒\n配送：${deliveryType}\n出貨：${dateChoice}\n` +
+    `收件：${info.name}　${info.phone}\n地址/門市：${info.location}\n━━━━━━━━━━━━\n` +
     `⚠️ 請確認最終金額（含運費）後聯繫客人`
   );
 
   await lineReply(replyToken,
-    `✅ 訂單已收到！\n\n` +
-    `數量：${qty}盒\n` +
-    `配送：${info.deliveryType}\n` +
-    `出貨日期：${info.dateChoice}\n` +
-    `收件人：${info.name}\n\n` +
+    `✅ 訂單已收到！\n\n數量：${qty}盒\n配送：${deliveryType}\n出貨日期：${dateChoice}\n收件人：${info.name}\n\n` +
     `我們將確認最終金額（含運費）後與您聯繫 🙏`
   );
 
@@ -377,8 +396,10 @@ app.post('/webhook', async (req, res) => {
     try {
       const session = getSession(userId);
 
-      if (session?.state === 'CONFIRM') { await stepConfirm(text, userId, replyToken, session); continue; }
-      if (session?.state === 'FORM')    { await stepForm(text, userId, replyToken, session); continue; }
+      if (session?.state === 'CONFIRM')  { await stepConfirm(text, userId, replyToken, session); continue; }
+      if (session?.state === 'DELIVERY') { await stepDelivery(text, userId, replyToken, session); continue; }
+      if (session?.state === 'DATE')     { await stepDate(text, userId, replyToken, session); continue; }
+      if (session?.state === 'INFO')     { await stepInfo(text, userId, replyToken, session); continue; }
 
       // 預設：解析數量 → 報價 + 問確認
       const parsed = parseQuantity(text);
