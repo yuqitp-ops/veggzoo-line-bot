@@ -277,13 +277,13 @@ function setSession(userId, data) {
 
 const CONFIRM_WORDS = /^(確認|對|會|是|yes)$/i;
 const DATES = { '超商 9/1–9/6': '9/1–9/6', '超商 9/7–9/13': '9/7–9/13', '超商 9/14–9/21': '9/14–9/21',
-                '宅配 9/1–9/6': '9/1–9/6', '宅配 9/7–9/13': '9/7–9/13', '宅配 9/14–9/21': '9/14–9/21' };
+                '郵寄 9/1–9/6': '9/1–9/6', '郵寄 9/7–9/13': '9/7–9/13', '郵寄 9/14–9/21': '9/14–9/21' };
 
 const CONFIRM_QUESTION = `確認訂單嗎？\n（回覆：確認 ／ 對 ／ 會 ／ 是 ／ Yes）`;
 
 const DELIVERY_BUTTONS = [
   { label: '超商（7-11／全家）$65', value: '超商' },
-  { label: '宅配（中華郵政）$150',  value: '宅配' }
+  { label: '郵寄（中華郵政）$150',  value: '郵寄' }
 ];
 
 // CONFIRM 狀態：等客人說確認
@@ -299,11 +299,7 @@ async function stepConfirm(text, userId, replyToken, session) {
   if (!CONFIRM_WORDS.test(text)) return;
   setSession(userId, { ...session, state: 'DELIVERY' });
   await lineReplyWithButtons(replyToken,
-    '請選擇配送方式 🚚\n\n' +
-    '1️⃣ 超商（7-11／全家）$65\n' +
-    '　　滿$2,026免運\n' +
-    '2️⃣ 宅配（中華郵政）$150\n\n' +
-    '手機點下方按鈕，或回覆「超商」／「宅配」',
+    '請選擇配送方式 🚚（請輸入超商 或 郵寄）\n點選下方按鈕👇',
     DELIVERY_BUTTONS
   );
 }
@@ -312,8 +308,8 @@ async function stepConfirm(text, userId, replyToken, session) {
 async function stepDelivery(text, userId, replyToken, session) {
   let deliveryType;
   if (text.includes('超商')) deliveryType = '超商';
-  else if (text.includes('宅配')) deliveryType = '宅配';
-  else { await lineReplyWithButtons(replyToken, '請選擇配送方式 😊', DELIVERY_BUTTONS); return; }
+  else if (text.includes('郵寄')) deliveryType = '郵寄';
+  else { await lineReplyWithButtons(replyToken, '請選擇配送方式 🚚（請輸入超商 或 郵寄）\n點選下方按鈕👇', DELIVERY_BUTTONS); return; }
 
   setSession(userId, { ...session, state: 'DATE', deliveryType });
 
@@ -364,7 +360,7 @@ async function stepInfo(text, userId, replyToken, session) {
   const missing = [];
   if (!info.name)     missing.push('姓名');
   if (!info.phone)    missing.push('電話');
-  if (!info.location) missing.push(session.deliveryType === '超商' ? '超商店名' : '住址');
+  if (!info.location) missing.push(session.deliveryType === '超商' ? '超商店名' : '住址（郵寄地址）');
 
   if (missing.length > 0) {
     await lineReply(replyToken, `以下欄位未填，請補充 😊\n\n${missing.map(m => `• ${m}`).join('\n')}`);
