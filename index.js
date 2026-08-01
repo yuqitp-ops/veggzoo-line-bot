@@ -298,7 +298,14 @@ async function stepConfirm(text, userId, replyToken, session) {
   }
   if (!CONFIRM_WORDS.test(text)) return;
   setSession(userId, { ...session, state: 'DELIVERY' });
-  await lineReplyWithButtons(replyToken, '請選擇配送方式 🚚\n點選下方按鈕👇', DELIVERY_BUTTONS);
+  await lineReplyWithButtons(replyToken,
+    '請選擇配送方式 🚚\n\n' +
+    '1️⃣ 超商（7-11／全家）$65\n' +
+    '　　滿$2,026免運\n' +
+    '2️⃣ 宅配（中華郵政）$150\n\n' +
+    '手機點下方按鈕，或回覆「超商」／「宅配」',
+    DELIVERY_BUTTONS
+  );
 }
 
 // DELIVERY 狀態：客人點按鈕選配送
@@ -310,9 +317,10 @@ async function stepDelivery(text, userId, replyToken, session) {
 
   setSession(userId, { ...session, state: 'DATE', deliveryType });
 
-  const freeNote = deliveryType === '超商' ? '（滿$2,026免運）' : '（滿$4,000免運）';
   await lineReplyWithButtons(replyToken,
-    `配送：${deliveryType} ✅\n\n請選擇出貨日期 📦`,
+    `配送：${deliveryType} ✅\n\n請選擇出貨日期 📦\n\n` +
+    `1️⃣ 9/1–9/6\n2️⃣ 9/7–9/13\n3️⃣ 9/14–9/21\n\n` +
+    `手機點下方按鈕，或回覆 1 / 2 / 3`,
     [
       { label: '9/1–9/6',   value: `${deliveryType} 9/1–9/6` },
       { label: '9/7–9/13',  value: `${deliveryType} 9/7–9/13` },
@@ -321,9 +329,11 @@ async function stepDelivery(text, userId, replyToken, session) {
   );
 }
 
-// DATE 狀態：客人點按鈕選日期
+// DATE 狀態：客人點按鈕或打字選日期
 async function stepDate(text, userId, replyToken, session) {
-  const dateChoice = DATES[text];
+  // 接受打字輸入 1/2/3
+  const numMap = { '1': '9/1–9/6', '2': '9/7–9/13', '3': '9/14–9/21' };
+  const dateChoice = DATES[text] || numMap[text.trim()];
   if (!dateChoice) {
     await lineReplyWithButtons(replyToken, '請選擇出貨日期 😊', [
       { label: '9/1–9/6',   value: `${session.deliveryType} 9/1–9/6` },
