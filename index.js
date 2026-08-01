@@ -396,19 +396,19 @@ app.post('/webhook', async (req, res) => {
     const replyToken = event.replyToken;
 
     try {
+      // 重新訂購優先：任何狀態都能觸發
+      if (text === '重新訂購') {
+        sessions.delete(userId);
+        await lineReply(replyToken, '已重置！請告訴我們您需要的數量（例如：4盒、2箱）😊');
+        continue;
+      }
+
       const session = getSession(userId);
 
       if (session?.state === 'CONFIRM')  { await stepConfirm(text, userId, replyToken, session); continue; }
       if (session?.state === 'DELIVERY') { await stepDelivery(text, userId, replyToken, session); continue; }
       if (session?.state === 'DATE')     { await stepDate(text, userId, replyToken, session); continue; }
       if (session?.state === 'INFO')     { await stepInfo(text, userId, replyToken, session); continue; }
-
-      // 重新訂購：清除 session 重來
-      if (text === '重新訂購') {
-        sessions.delete(userId);
-        await lineReply(replyToken, '已重置！請告訴我們您需要的數量（例如：4盒、2箱）😊');
-        continue;
-      }
 
       // 預設：解析數量 → 報價 + 問確認
       const parsed = parseQuantity(text);
