@@ -405,7 +405,7 @@ app.post('/webhook', async (req, res) => {
 
       // 改量：訊息含「改 N盒/N箱」時，任何狀態都能重新報價
       const changeMatch = text.match(/(?:改|更新數量為)\s*(\d+|[一二三四五六七八九十]+)\s*(盒|箱)/);
-      if (changeMatch && sessions.has(userId)) {
+      if (changeMatch) {
         const n = toNum(changeMatch[1]);
         const unit = changeMatch[2];
         if (n > 0) {
