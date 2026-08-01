@@ -403,6 +403,26 @@ app.post('/webhook', async (req, res) => {
         continue;
       }
 
+      // 改量：訊息含「改 N盒/N箱」時，任何狀態都能重新報價
+      const changeMatch = text.match(/改\s*(\d+|[一二三四五六七八九十]+)\s*(盒|箱)/);
+      if (changeMatch && sessions.has(userId)) {
+        const n = toNum(changeMatch[1]);
+        const unit = changeMatch[2];
+        if (n > 0) {
+          let parsed;
+          if (unit === '箱') {
+            parsed = { qty: n * PRODUCT.bulkUnit, boxes: n, isBulk: true };
+          } else {
+            const isBulk = n >= PRODUCT.bulkUnit && n % PRODUCT.bulkUnit === 0;
+            parsed = { qty: n, boxes: isBulk ? n / PRODUCT.bulkUnit : null, isBulk };
+          }
+          const msg = parsed.isBulk ? buildBulkQuote(parsed.qty, parsed.boxes) : buildGeneralQuote(parsed.qty);
+          setSession(userId, { state: 'CONFIRM', qty: parsed.qty, boxes: parsed.boxes, isBulk: parsed.isBulk });
+          await lineReplyMulti(replyToken, [msg, CONFIRM_QUESTION]);
+          continue;
+        }
+      }
+
       const session = getSession(userId);
 
       if (session?.state === 'CONFIRM')  { await stepConfirm(text, userId, replyToken, session); continue; }
