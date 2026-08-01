@@ -263,16 +263,12 @@ async function linePush(to, text) {
 
 // ── 狀態管理 ──────────────────────────────────────
 const sessions = new Map();
-const SESSION_TIMEOUT = 30 * 60 * 1000;
 
 function getSession(userId) {
-  const s = sessions.get(userId);
-  if (!s) return null;
-  if (Date.now() - s.updatedAt > SESSION_TIMEOUT) { sessions.delete(userId); return null; }
-  return s;
+  return sessions.get(userId) || null;
 }
 function setSession(userId, data) {
-  sessions.set(userId, { ...data, updatedAt: Date.now() });
+  sessions.set(userId, data);
 }
 
 const CONFIRM_WORDS = /^(確認|對|會|是|yes)$/i;
@@ -406,6 +402,13 @@ app.post('/webhook', async (req, res) => {
       if (session?.state === 'DELIVERY') { await stepDelivery(text, userId, replyToken, session); continue; }
       if (session?.state === 'DATE')     { await stepDate(text, userId, replyToken, session); continue; }
       if (session?.state === 'INFO')     { await stepInfo(text, userId, replyToken, session); continue; }
+
+      // 重新訂購：清除 session 重來
+      if (text === '重新訂購') {
+        sessions.delete(userId);
+        await lineReply(replyToken, '已重置！請告訴我們您需要的數量（例如：4盒、2箱）😊');
+        continue;
+      }
 
       // 預設：解析數量 → 報價 + 問確認
       const parsed = parseQuantity(text);
