@@ -335,8 +335,8 @@ async function stepDate(text, userId, replyToken, session) {
 
   setSession(userId, { ...session, state: 'INFO', dateChoice });
   const infoPrompt = session.deliveryType === '超商'
-    ? `出貨日期：${dateChoice} ✅\n\n請填寫收件資料，直接回傳 😊\n\n姓名：\n電話：\n超商門市代號：`
-    : `出貨日期：${dateChoice} ✅\n\n請填寫收件資料，直接回傳 😊\n\n姓名：\n電話：\n宅配地址：`;
+    ? `出貨日期：${dateChoice} ✅\n\n超商資訊\n─────────────\n姓名：\n電話：\n超商店名：（請註明全家或 7-11）`
+    : `出貨日期：${dateChoice} ✅\n\n郵寄資訊\n─────────────\n姓名：\n電話：\n住址：`;
   await lineReply(replyToken, infoPrompt);
 }
 
@@ -346,15 +346,15 @@ async function stepInfo(text, userId, replyToken, session) {
   for (const line of text.split('\n')) {
     const t = line.trim();
     const val = t.replace(/.*[：:]\s*/, '').trim();
-    if (/姓名/.test(t))              info.name = val;
-    if (/電話/.test(t))              info.phone = val;
-    if (/門市代號|宅配地址|地址/.test(t)) info.location = val;
+    if (/姓名/.test(t))        info.name = val;
+    if (/電話/.test(t))        info.phone = val;
+    if (/超商店名|住址/.test(t)) info.location = val;
   }
 
   const missing = [];
   if (!info.name)     missing.push('姓名');
   if (!info.phone)    missing.push('電話');
-  if (!info.location) missing.push(session.deliveryType === '超商' ? '超商門市代號' : '宅配地址');
+  if (!info.location) missing.push(session.deliveryType === '超商' ? '超商店名' : '住址');
 
   if (missing.length > 0) {
     await lineReply(replyToken, `以下欄位未填，請補充 😊\n\n${missing.map(m => `• ${m}`).join('\n')}`);
