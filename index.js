@@ -298,7 +298,7 @@ async function stepConfirm(text, userId, replyToken, session) {
   }
   if (!CONFIRM_WORDS.test(text)) return;
   setSession(userId, { ...session, state: 'DELIVERY' });
-  await lineReplyWithButtons(replyToken, '請選擇配送方式 🚚', DELIVERY_BUTTONS);
+  await lineReplyWithButtons(replyToken, '請選擇配送方式 🚚\n點選下方按鈕👇', DELIVERY_BUTTONS);
 }
 
 // DELIVERY 狀態：客人點按鈕選配送
